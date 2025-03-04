@@ -6,3 +6,4 @@
 # 3/01 Enemy Anim,TakeDamage
 # 3/02 Player Move 수정
 # To do list 작성
+*공개 설정 변경
