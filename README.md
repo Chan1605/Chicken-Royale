@@ -1,3 +1,4 @@
+# git lfs pull 입력 필수!!
 # Chicken Royale 
 # 3D TPS
 # To do list 
