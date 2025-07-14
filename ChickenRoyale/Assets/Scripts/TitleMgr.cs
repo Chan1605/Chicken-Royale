@@ -2,16 +2,12 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using DG.Tweening;
+using UnityEngine.EventSystems;
 
 
 public class TitleMgr : MonoBehaviour
 {
-    public Image Fadeimage;
-    public Button ReAnimBtn;
-    public Button PlayBtn;
-    public GameObject TitleAnim;
-    public GameObject FadePanel;
-    float fadeCount = 0;
     [Header("----- Guide Text -----")]
     public TextMeshProUGUI m_Guidetxt;
     public Color color1 = Color.blue;
@@ -20,6 +16,10 @@ public class TitleMgr : MonoBehaviour
     public float floatAmplitude;
     public float floatFrequency;
     private Vector3 startPos;
+    public GameObject nameInputPanel;
+    [SerializeField] public TMP_InputField nameInput;
+    private bool isLoading = false;
+    private bool isSceneLoading = false;
     // Start is called before the first frame update
     void Start()
     {
@@ -29,52 +29,105 @@ public class TitleMgr : MonoBehaviour
             m_Guidetxt = GetComponent<TextMeshProUGUI>();
 
         startPos = m_Guidetxt.rectTransform.anchoredPosition;
-
-        if (ReAnimBtn != null)
-            ReAnimBtn.onClick.AddListener(AnimStart);
-        if (PlayBtn != null)
-            PlayBtn.onClick.AddListener(GameStart);
-        Time.timeScale = 1.0f;
     }
 
     // Update is called once per frame
     void Update()
     {
-        // 색상 점점 바뀌게 (PingPong 방식)
+        // 색상 변화 및 떠다니는 효과 유지
         float t = Mathf.PingPong(Time.time * colorChangeSpeed, 1f);
         m_Guidetxt.color = Color.Lerp(color1, color2, t);
-
-        // 텍스트 살짝 위아래로 떠다니게
         float offsetY = Mathf.Sin(Time.time * floatFrequency) * floatAmplitude;
         m_Guidetxt.rectTransform.anchoredPosition = startPos + new Vector3(0, offsetY, 0);
-        if (Input.anyKeyDown)
+
+        if (Input.anyKeyDown && !nameInputPanel.activeSelf && !isLoading)
         {
-            LoadingCtrl.LoadScene("Game_Scene_Field");
+            isLoading = true;
+            // 닉네임이 이미 저장되어 있다면 → 바로 게임 씬으로
+            if (PlayerPrefs.HasKey("MyNickname"))
+            {
+                
+                string savedNickname = PlayerPrefs.GetString("MyNickname");
+                PlayFabLogin.Inst.LoginAndSetDisplayName(savedNickname, () =>
+                {
+                    LoadingCtrl.LoadScene("Game_Scene_Field");
+                });
+            }
+            else
+            {
+                // 최초 진입 시에만 패널 표시
+                ShowLoginPanel();
+                isLoading = false;                
+            }
         }
     }
 
-    void GameStart()
+
+    void OnEnable()
     {
-        //StartCoroutine(FadeCoroutine());       
-        LoadingCtrl.LoadScene("Game_Scene_Field");
+        if (PlayFabLogin.Inst != null)
+        {
+            var text = GetComponent<TextMeshProUGUI>();
+            if (text != null)
+                PlayFabLogin.Inst.Logininfotxt = text;
+        }
+    }
+
+    public void OnClick_StartGame()
+    {
+        if (isSceneLoading) 
+            return;
+        EventSystem.current.SetSelectedGameObject(null); // 포커스 강제 해제
+
+        string finalName = nameInput.text;
+
+        if (string.IsNullOrEmpty(nameInput.text))
+        {
+            Debug.LogWarning("닉네임을 입력해주세요.");
+            return;
+        }
         
-    }
-
-    void AnimStart()
-    {
-        TitleAnim.gameObject.SetActive(true);
-    }
-
-    IEnumerator FadeCoroutine()
-    {
-        FadePanel.SetActive(true);
-        fadeCount = 0;
-        while (fadeCount < 1.0f)
+        
+        PlayFabLogin.Inst.LoginAndSetDisplayName(finalName, () =>
         {
-            fadeCount += 0.01f;
-            yield return new WaitForSeconds(0.01f);
-            Fadeimage.color = new Color(0, 0, 0, fadeCount);
-        }
+            isSceneLoading = true;
+            // 닉네임 저장
+            PlayerPrefs.SetString("MyNickname", nameInput.text);    
+
+            LoadingCtrl.LoadScene("Game_Scene_Field");
+        });
+
     }
+
+    public void HidePanel()
+    {
+        nameInputPanel.transform.DOScale(Vector3.zero, 0.3f)
+       .SetUpdate(true)
+       .SetEase(Ease.InBack)
+       .OnComplete(() =>
+       {
+           nameInputPanel.SetActive(false);
+           m_Guidetxt.gameObject.SetActive(true);
+           nameInput.text = "";
+           PlayFabLogin.Inst.Logininfotxt.text = "닉네임을 입력해주세요 !";
+       });
+    }
+
+
+    public void ShowLoginPanel()
+    {
+        nameInputPanel.SetActive(true);
+        m_Guidetxt.gameObject.SetActive(false);
+
+
+        nameInputPanel.transform.localScale = Vector3.zero;
+
+        nameInputPanel.transform.DOScale(Vector3.one, 0.5f)
+            .SetUpdate(true)
+            .SetEase(Ease.OutBack);
+
+    }
+
+
 
 }

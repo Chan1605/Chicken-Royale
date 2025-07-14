@@ -9,11 +9,10 @@ using UnityEditor;
 public class EnemyCtrl : MonoBehaviour
 {
     public enum Monstate { idle, patrol, trace, attack, hit, die };
-
     [SerializeField] Monstate m_MonSt = Monstate.idle;
-
     public enum MonType { Bear, Dino };
-
+    [SerializeField] private Renderer[] m_Renders;
+    [SerializeField] private Material[] m_newMaterials;
     public MonType m_MonType;
     private Animator m_Anim;
     private bool m_isDie = false;
@@ -37,14 +36,24 @@ public class EnemyCtrl : MonoBehaviour
     public GameObject m_BloodDecal;
     public GameObject m_BloodEffect;
     [Header("----- MonBullet -----")]
-    public GameObject m_EnemyBull; // 적 총알 오브젝트
+    public GameObject[] m_EnemyBull; // 적 총알 오브젝트
+    private int m_EnemyBulletIndex = 0;
     public Transform m_Enemytip; // 총구 위치
     [Header("----- Patrol-----")]
     [SerializeField] private Transform WayPoints;
     private int curpos = 0;
     //private NavMeshAgent m_Nav;
     private Image hpBar;
-
+    [Header("----- Sell ItemData -----")]
+    public List<DropItemInfo> dropItemList = new List<DropItemInfo>();
+    public int dropAmount = 1;
+    [System.Serializable]
+    public class DropItemInfo
+    {
+        public InventoryItemData itemData;
+        [Range(0f, 1f)]
+        public float dropChance; 
+    }
 
     void Awake()
     {
@@ -104,22 +113,43 @@ public class EnemyCtrl : MonoBehaviour
         HpbarCtrl hpbarCtrl = FindObjectOfType<HpbarCtrl>();
         hpbarCtrl.Register(this.transform, this);
         hpBar.GetComponent<Image>().fillAmount = 1.0f;
+
         switch (m_DeathCount)
         {
             case >= 2:
+                m_EnemyBulletIndex = 2;
                 m_maxdelay = 0.1f;
                 m_Eattackdamage = 20;
+                m_tracedist = 100f;
+                m_attackdist = 20f;
+                m_monspeed = 10f;
+
+                ChangeToDeadMaterials();
                 break;
             case >= 1:
+                m_EnemyBulletIndex = 1;
                 m_maxdelay = 0.2f;
                 m_Eattackdamage = 10;
+                m_tracedist = 50f;
+                m_monspeed = 8f;
+                m_attackdist = 17f;
+                ChangeTintColor(Color.red);
                 break;
             default:
+                m_EnemyBulletIndex = 0;
                 m_maxdelay = 0.3f;
                 m_Eattackdamage = 1;
                 break;
         }
     }
+
+    // private IEnumerator EnemyAttackBullet(int bulletIndex)
+    // {
+    //     m_EnemyBulletIndex = bulletIndex;   
+
+    //     yield return null;
+    // }
+
     public void SetHpBar(Image hpBarImage)
     {
         hpBar = hpBarImage;
@@ -170,6 +200,53 @@ public class EnemyCtrl : MonoBehaviour
             CreateBloodEffect(this.transform.position);
 
             //StartCoroutine(ResetHitCoroutine());
+        }
+    }
+
+
+    void ChangeTintColor(Color color)
+    {
+        if (m_Renders == null || m_Renders.Length == 0)
+            return;
+
+        foreach (Renderer renderer in m_Renders)
+        {
+            if (renderer == null) continue;
+
+            Material mat = renderer.material;
+
+            if (mat.HasProperty("PBRMaskTint"))
+            {
+                mat.SetColor("PBRMaskTint", color);
+            }
+            else if (mat.HasProperty("_BaseColor"))
+            {
+                mat.SetColor("_BaseColor", color);
+            }
+            else if (mat.HasProperty("_Color"))
+            {
+                mat.SetColor("_Color", color);
+            }
+            else if (mat.HasProperty("_TintColor"))
+            {
+                mat.SetColor("_TintColor", color);
+            }
+            else
+            {
+                Debug.LogWarning($"[{renderer.name}] Tint 속성 없음");
+            }
+        }
+    }
+
+
+    public void ChangeToDeadMaterials()
+    {
+        for (int i = 0; i < m_Renders.Length && i < m_newMaterials.Length; i++)
+        {
+            if (m_Renders[i] != null && m_newMaterials[i] != null)
+            {
+                m_Renders[i].material = m_newMaterials[i];
+            }
         }
     }
 
@@ -261,9 +338,30 @@ public class EnemyCtrl : MonoBehaviour
             if (GameMgr.inst.m_Coin != null)
             {
                 int idx = Random.Range(0, GameMgr.inst.m_Coin.Length);
-                GameObject a_CoinObj = Instantiate(GameMgr.inst.m_Coin[idx]);
-                a_CoinObj.transform.position = this.transform.position + Vector3.up;
-                Destroy(a_CoinObj, 10f);
+                GameObject a_ItemObj = Instantiate(GameMgr.inst.m_Coin[idx]);
+                a_ItemObj.transform.position = this.transform.position + Vector3.up;
+
+                Itempickup pickup = a_ItemObj.GetComponent<Itempickup>();
+                if (pickup != null && pickup.itemData != null)
+                {
+                    switch (pickup.itemData.itemId)
+                    {
+                        case "0": //코인
+                            pickup.amount = (m_DeathCount >= 2) ? 200 : (m_DeathCount == 1 ? 150 : 100);
+                            break;
+                        case "1": //다이아
+                            pickup.amount = 1;
+                            break;
+                        case "2": //수류탄
+                            pickup.amount = 1;
+                            break;
+                        case "3": //힐
+                            pickup.amount = 1;
+                            break;
+                    }
+                }
+
+                Destroy(a_ItemObj, 10f);
             }
             StartCoroutine(DisableAfterDelay(1.0f)); // 2초 뒤에 비활성화
         }
@@ -302,7 +400,7 @@ public class EnemyCtrl : MonoBehaviour
 
         if (dist <= m_attackdist)  // 공격 사거리 체크
         {
-            GameObject bullet = Instantiate(m_EnemyBull, m_Enemytip.position, m_Enemytip.rotation);
+            GameObject bullet = Instantiate(m_EnemyBull[m_EnemyBulletIndex], m_Enemytip.position, m_Enemytip.rotation);
             EnemyBullet enemyBullet = bullet.GetComponent<EnemyBullet>();
             if (enemyBullet != null)
             {
@@ -366,6 +464,29 @@ public class EnemyCtrl : MonoBehaviour
         m_Anim.SetTrigger("IsPlayerDie");
     }
 
+    void DropRandomItem()
+    {
+        if (dropItemList == null || dropItemList.Count == 0) 
+        return;
+
+        float totalChance = 0f;
+        foreach (var drop in dropItemList)
+            totalChance += drop.dropChance;
+
+        float rand = Random.Range(0f, totalChance);
+        float cumulative = 0f;
+
+        foreach (var drop in dropItemList)
+        {
+            cumulative += drop.dropChance;
+            if (rand <= cumulative)
+            {
+                InventoryManager.Inst.AddItem(drop.itemData, dropAmount);
+                break;
+            }
+        }
+    }
+
     void EnemyDie()
     {
         m_isDie = true;
@@ -376,6 +497,8 @@ public class EnemyCtrl : MonoBehaviour
         else
             GameMgr.inst.ScoreUpdate(100, 1);
         m_DeathCount++;
+
+        DropRandomItem(); 
 
         m_Anim.StopPlayback();
 

@@ -5,6 +5,8 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using DG.Tweening;
+using PlayFab;
+using PlayFab.ClientModels;
 
 public class GameMgr : MonoBehaviour
 {
@@ -29,12 +31,14 @@ public class GameMgr : MonoBehaviour
     [SerializeField] int m_CurScore = 0;
     [SerializeField] int m_Curkill = 0;
     private int m_HighScore = 0;
+    private int m_HighKill = 0;
 
     [Header("----- UIinfo -----")]
     public TextMeshProUGUI m_GuideText;
     public TextMeshProUGUI m_KillText;
     public TextMeshProUGUI m_Grenadetxt;
     public int m_GranadeCount = 0;
+    private int m_MaxGranade = 99;
     float GuideTimer = 0f;
     [Header("----- Buff -----")]
     private float duration;
@@ -43,30 +47,61 @@ public class GameMgr : MonoBehaviour
     public Image m_Buff;
     public Image m_Durimg;
     [HideInInspector] public bool m_Gameover = false;
+    public TextMeshProUGUI m_UserName;
 
     [Header("----- Pause Panel -----")]
     public GameObject m_Panel;
-    public Button m_TitleBtn;
-    public Button m_Reset;
     [Header("----- End Panel -----")]
     public GameObject m_EndPanel;
     public Button m_YesBtn;
     public Button m_NoBtn;
     public TextMeshProUGUI m_EndScoretxt;
+    [Header("----- PopUp Panel -----")]
+    public GameObject m_Popup;
+    public TextMeshProUGUI m_infoText;
+    private bool m_isPopup = false;
+    private System.Action m_OnPopupConfirm;
+    [Header("----- Rank Panel -----")]
+    public GameObject m_RankPanel;
+    public TextMeshProUGUI m_Rankname;
+    public TextMeshProUGUI m_RankScore;
+    public TextMeshProUGUI m_MyRankText;
+    [SerializeField] private Sprite[] rankSprites;
+    [SerializeField] private Image m_MedalImage;
+    [SerializeField] private Transform rankContent;
+    [SerializeField] private GameObject rankItemPrefab;
+    [SerializeField] private Sprite[] m_RankMedals;
+    [Header("----- Inventory -----")]
+    public GameObject m_InvenPanel;
+    public bool m_isInven = false;
+    public int Gold { get; private set; }
+
     [Header("----- Tutorial -----")]
     public CanvasGroup m_tutorialGroup;
     public float m_showDuration = 10f;
     private bool m_hasShown = false;
     [Header("----- SkyBox -----")]
     public Material[] skyboxMaterials;
+    [Header("수류탄 아이템 데이터")]
+    [SerializeField] private InventoryItemData grenadeData;
 
     // Start is called before the first frame update
     void Start()
-    {
+    {       
         m_Curgame = GameState.Start;
         m_GuideText.gameObject.SetActive(false);
-        m_GranadeCount = 10;
+        InventoryManager.Inst.AddItem(grenadeData, 10);
+        m_GranadeCount = InventoryManager.Inst.GetItemCount("2");
+        Gold = 0;
         m_HighScore = PlayerPrefs.GetInt("HighScore", 0);
+        m_HighKill = PlayerPrefs.GetInt("HighKill", 0);
+
+        PlayFabLogin.Inst.GetDisplayName((nickname) =>
+        {
+            m_UserName.text = "이름 : " + nickname;
+
+            ScoreUpdate(0, 0);
+        });
         if (skyboxMaterials.Length > 0)
         {
             int index = Random.Range(0, skyboxMaterials.Length);
@@ -82,10 +117,11 @@ public class GameMgr : MonoBehaviour
             ShowTutorial();
             m_hasShown = true;
         }
+        if (SoundMgr.Instance != null)
+        {
+            SoundMgr.Instance.PlayBGM("InGamebgm", 1f);
+        }
 
-        SoundMgr.Instance.PlayBGM("InGamebgm", 1f);
-        ScoreUpdate(0, 0);
-        GreGuide(0);
         m_Crosshair.SetActive(false);
         m_Points = GameObject.Find("EnemyGroup").GetComponentsInChildren<Transform>();
         for (int i = 0; i < m_Maxenemy; i++)
@@ -104,10 +140,6 @@ public class GameMgr : MonoBehaviour
 
             StartCoroutine(this.CreateMonster());
         }
-        if (m_TitleBtn != null)
-            m_TitleBtn.onClick.AddListener(TitleBack);
-        if (m_Reset != null)
-            m_Reset.onClick.AddListener(RemoveScore);
 
     }
 
@@ -119,11 +151,25 @@ public class GameMgr : MonoBehaviour
         BuffTimer();
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            if (m_Curgame == GameState.End)
+            if (m_Curgame == GameState.End || m_isPopup || m_isInven)
                 return;
 
             EscCtr();
         }
+        if (Input.GetKeyDown(KeyCode.I))
+        {
+            if (m_Curgame == GameState.Pause)
+                return;
+            if (m_isPopup)
+                HideInvenPanel();
+            else
+                ShowInvenPanel();
+        }
+    }
+
+    public void AddGold(int amount)
+    {
+        Gold += amount;
     }
 
 
@@ -152,15 +198,6 @@ public class GameMgr : MonoBehaviour
         if (m_Crosshair == null)
             m_Crosshair = GameObject.Find("Crosshair");
 
-        if (m_TitleBtn == null)
-        {
-            GameObject panel = GameObject.Find("PausePanel");
-            if (panel != null)
-                m_TitleBtn = panel.transform.Find("TitleBtn").GetComponent<Button>();
-        }
-
-        if (m_TitleBtn != null)
-            m_TitleBtn.onClick.AddListener(TitleBack);
     }
 
 
@@ -203,21 +240,71 @@ public class GameMgr : MonoBehaviour
         {
             m_Curkill = 0;
         }
+
         if (m_CurScore > m_HighScore)
         {
             m_HighScore = m_CurScore;
+
             PlayerPrefs.SetInt("HighScore", m_HighScore);
-            PlayerPrefs.Save();
+            if (PlayFabLogin.IsLoggedIn)
+            {
+                SendScoreToPlayFab(m_HighScore);
+                Debug.Log($"로그인 상태: {PlayFabLogin.IsLoggedIn}");
+            }
+            else
+            {
+                Debug.Log("아직 로그인되지 않았습니다.");
+            }
         }
 
-        m_ScoreTxt.text = "Score : " + m_CurScore; //+ "\n HighScore : " + m_HighScore;
-        m_KillText.text = "잡은 곰 : " + m_Curkill;
+
+        m_ScoreTxt.text = "Score : " + m_CurScore;
+        m_KillText.text = "Kill Count : " + m_Curkill;
+    }
+
+    void SendScoreToPlayFab(int score)
+    {
+        var request = new UpdatePlayerStatisticsRequest
+        {
+            Statistics = new List<StatisticUpdate>
+        {
+            new()
+            {
+                StatisticName = "HighScore",
+                Value = score
+            }
+        }
+        };
+
+        PlayFab.PlayFabClientAPI.UpdatePlayerStatistics(request,
+            result => Debug.Log("PlayFab 점수 업로드 성공"),
+            error => Debug.LogError("PlayFab 점수 업로드 실패: " + error.GenerateErrorReport()));
+    }
+
+    void SendKillToPlayFab(int killCount)
+    {
+        var request = new UpdatePlayerStatisticsRequest
+        {
+            Statistics = new List<StatisticUpdate>
+        {
+            new()
+            {
+                StatisticName = "HighKill",
+                Value = killCount
+            }
+        }
+        };
+
+        PlayFabClientAPI.UpdatePlayerStatistics(request,
+            result => { Debug.Log("킬 카운트 업데이트 성공"); },
+            error => { Debug.LogError("킬 카운트 업데이트 실패: " + error.GenerateErrorReport()); });
+
     }
 
 
     void Crossharictrl()
     {
-        if (PlayerCtrl.inst.m_isDie || GameMgr.inst.m_Curgame == GameMgr.GameState.End)
+        if (PlayerCtrl.inst.m_isDie || m_Curgame == GameState.End || m_Curgame == GameState.Pause || m_isInven)
         {
             m_Crosshair.SetActive(false);
             return;
@@ -238,14 +325,14 @@ public class GameMgr : MonoBehaviour
         GuideTimer = duration;
     }
 
+
     public void GreGuide(int count)
     {
-        m_GranadeCount += count;
-        if (m_GranadeCount < 0)
-            m_GranadeCount = 0;
-
-        m_Grenadetxt.text = "x " + m_GranadeCount;
+        m_GranadeCount = count;
+        m_Grenadetxt.text = $"{m_GranadeCount}"+ " / "+ $"{m_MaxGranade}";
     }
+    
+
 
     public void GuideInfo()
     {
@@ -270,7 +357,7 @@ public class GameMgr : MonoBehaviour
         m_Panel.transform.localScale = Vector3.zero;
         // 타임스케일 멈추기 전에 애니메이션 실행
         m_Panel.transform.DOScale(Vector3.one, 0.5f)
-            .SetUpdate(true)  // ⬅️ 이걸 써야 타임스케일 0에서도 애니메이션이 작동함
+            .SetUpdate(true)
             .SetEase(Ease.OutBack);
         Time.timeScale = 0.0f;
 
@@ -281,6 +368,7 @@ public class GameMgr : MonoBehaviour
 
     public void Resume()
     {
+        SoundMgr.Instance.PlayEffSound("SFX_UI_Button_Click_Settings_2", 0.5f);
         m_Panel.transform.DOScale(Vector3.zero, 0.3f)
        .SetUpdate(true)
        .SetEase(Ease.InBack)
@@ -315,17 +403,27 @@ public class GameMgr : MonoBehaviour
     public void GameOver()
     {
         ShowGameOverPanel();
+
         m_ScoreTxt.gameObject.SetActive(false);
         m_EndPanel.SetActive(true);
         m_YesBtn.onClick.AddListener(ReGame);
         m_NoBtn.onClick.AddListener(TitleBack);
-        m_EndScoretxt.text = "<color=blue>획득 점수 : " + m_CurScore + "</color>\n" +
-    "<color=red>최고 점수 : " + m_HighScore + "</color>";
+        m_EndScoretxt.text = "<color=white>Score : " + m_CurScore + "</color>\n" +
+    "<color=yellow>Best Score : " + m_HighScore + "</color>";
+        if (m_Curkill > m_HighKill)
+        {
+            m_HighKill = m_Curkill;
+            PlayerPrefs.SetInt("HighKill", m_HighKill);
+            if (PlayFabLogin.IsLoggedIn)
+            {           
+                SendKillToPlayFab(m_HighKill);
+            }
+        }
         Cursor.lockState = CursorLockMode.Confined;
         Cursor.visible = true;
     }
 
-    void TitleBack()
+    public void TitleBack()
     {
         SoundMgr.Instance.PlayEffSound("SFX_UI_Button_Click_Settings_2", 0.5f);
         m_NoBtn.transform.DOShakePosition(0.3f, 10, 20, 90, false, true)
@@ -334,10 +432,9 @@ public class GameMgr : MonoBehaviour
             {
                 ClearIngameObjects();
                 LoadingCtrl.LoadScene("TitleScene");
-                // 타이틀로
             });
     }
-    void ReGame()
+    public void ReGame()
     {
         SoundMgr.Instance.PlayEffSound("SFX_UI_Button_Click_Settings_2", 0.5f);
         m_YesBtn.transform.DOScale(1.2f, 0.1f)
@@ -346,6 +443,9 @@ public class GameMgr : MonoBehaviour
     .OnComplete(() =>
     {
         m_YesBtn.transform.DOScale(1.0f, 0.1f).SetEase(Ease.InQuad);
+        Time.timeScale = 1f;
+        m_Curgame = GameState.Start;
+        m_esc = false;
         ClearIngameObjects();
         LoadingCtrl.LoadScene("Game_Scene_Field");
     });
@@ -373,19 +473,281 @@ public class GameMgr : MonoBehaviour
         m_EndPanel.transform.DOScale(Vector3.one, 2f).SetEase(Ease.OutBack);
     }
 
+    public void ShowPopupPanel(string infoMessage, System.Action onConfirm)
+    {
+        m_isPopup = true;
+        m_infoText.text = infoMessage;
+        m_OnPopupConfirm = onConfirm;  // 콜백 저장
+
+        m_Popup.SetActive(true);
+        m_Popup.transform.localScale = Vector3.zero;
+
+        m_Popup.transform.DOScale(Vector3.one, 0.5f)
+            .SetUpdate(true)
+            .SetEase(Ease.OutBack);
+
+        Time.timeScale = 0.0f;
+    }
+
+    public void OnClick_TitleButton()
+    {
+        SoundMgr.Instance.PlayEffSound("SFX_UI_Button_Click_Settings_2", 0.5f);
+        ShowPopupPanel("타이틀로 돌아가시겠습니까?", TitleBack);
+    }
+    public void OnClick_ReGameButton()
+    {
+        SoundMgr.Instance.PlayEffSound("SFX_UI_Button_Click_Settings_2", 0.5f);
+        ShowPopupPanel("게임을 재시작 합니다!", ReGame);
+    }
+
+    public void OnClick_ResetScoreButton()
+    {
+        SoundMgr.Instance.PlayEffSound("SFX_UI_Button_Click_Settings_2", 0.5f);
+        ShowPopupPanel("최고점수가 삭제 됩니다!", RemoveScore);
+    }
+    public void OnClick_RankButton()
+    {
+        SoundMgr.Instance.PlayEffSound("SFX_UI_Button_Click_Settings_2", 0.5f);
+        m_RankPanel.SetActive(true);
+        m_isPopup = true;
+        m_RankPanel.transform.localScale = Vector3.zero;
+
+        GetLeaderboard();         //전체 랭킹
+        UpdateRankPanelInfo();    //본인 순위 
+
+        m_RankPanel.transform.DOScale(Vector3.one, 0.5f)
+            .SetUpdate(true)
+            .SetEase(Ease.OutBack);
+    }
+    public void HideRankPanel()
+    {
+        SoundMgr.Instance.PlayEffSound("SFX_UI_Button_Click_Settings_2", 0.5f);
+        m_RankPanel.transform.DOScale(Vector3.zero, 0.3f)
+       .SetUpdate(true)
+       .SetEase(Ease.InBack)
+       .OnComplete(() =>
+       {
+           m_RankPanel.SetActive(false);
+           m_isPopup = false;
+       });
+    }
+
+    public void ShowInvenPanel()
+    {
+        m_InvenPanel.SetActive(true); // 반드시 활성화
+        m_InvenPanel.transform.localScale = Vector3.zero;
+
+        m_InvenPanel.transform.DOScale(Vector3.one, 0.5f)
+            .SetUpdate(true)
+            .SetEase(Ease.OutBack);
+
+        m_isPopup = true;
+        m_isInven = true;
+        
+        Cursor.lockState = CursorLockMode.Confined;
+        Cursor.visible = true;
+        Time.timeScale = 0.0f;
+    }
+
+    public void HideInvenPanel()
+    {
+        SoundMgr.Instance.PlayEffSound("SFX_UI_Button_Click_Settings_2", 0.5f);
+        m_InvenPanel.transform.DOScale(Vector3.zero, 0.3f)
+       .SetUpdate(true)
+       .SetEase(Ease.InBack)
+       .OnComplete(() =>
+       {
+           m_isPopup = false;
+           m_isInven = false;
+            Time.timeScale = 1.0f;
+           if(m_Curgame == GameState.End)
+               return;
+           Cursor.lockState = CursorLockMode.Locked;
+           Cursor.visible = false;        
+       });
+    }
+
+
+
+    void UpdateRankPanelInfo()
+    {
+        if (PlayFabLogin.IsLoggedIn)
+        {
+            Debug.Log($"로그인 상태: {PlayFabLogin.IsLoggedIn}");
+            // 닉네임 불러오기
+            PlayFabClientAPI.GetAccountInfo(new GetAccountInfoRequest(),
+            result =>
+            {
+                string nickname = result.AccountInfo.TitleInfo.DisplayName;
+                m_Rankname.text = $"{nickname}";
+            },
+            error =>
+            {
+                Debug.LogError("닉네임 불러오기 실패: " + error.GenerateErrorReport());
+                m_Rankname.text = $"Unknown";
+            });
+
+            // 점수 불러오기
+            PlayFabClientAPI.GetPlayerStatistics(new GetPlayerStatisticsRequest(),
+            result =>
+            {
+                var stat = result.Statistics.Find(s => s.StatisticName == "HighScore");
+                int highScore = stat != null ? stat.Value : 0;
+
+                var highKillStat = result.Statistics.Find(s => s.StatisticName == "HighKill");
+                int highKill = highKillStat != null ? highKillStat.Value : 0;
+
+
+                m_RankScore.text = $"Kill Count : {highKill}\n {highScore}";
+            },
+            error =>
+            {
+                Debug.LogError("점수 불러오기 실패: " + error.GenerateErrorReport());
+                m_RankScore.text = "0";
+            });
+            PlayFabClientAPI.GetLeaderboardAroundPlayer(new GetLeaderboardAroundPlayerRequest
+            {
+                StatisticName = "HighScore",
+                MaxResultsCount = 1
+            },
+            result =>
+            {
+                int myRank = result.Leaderboard[0].Position + 1;
+                m_MyRankText.text = myRank.ToString();
+                if (myRank <= 3)
+                {
+                    m_MedalImage.gameObject.SetActive(true);
+                    m_MedalImage.sprite = m_RankMedals[myRank - 1]; // 1등은 0번 인덱스
+                    switch (myRank)
+                    {
+                        case 1:
+                            m_MedalImage.rectTransform.sizeDelta = new Vector2(124, 108);
+                            break;
+                        case 2:
+                            m_MedalImage.rectTransform.sizeDelta = new Vector2(111, 108);
+                            break;
+                        case 3:
+                            m_MedalImage.rectTransform.sizeDelta = new Vector2(82, 108);
+                            break;
+                    }
+                }
+                else
+                {
+                    m_MedalImage.gameObject.SetActive(false);
+                    m_MyRankText.gameObject.SetActive(true);
+                }
+            },
+            error =>
+            {
+                Debug.LogError("자기 순위 불러오기 실패: " + error.GenerateErrorReport());
+                m_MyRankText.text = "-";
+                m_MedalImage.gameObject.SetActive(false);
+            });
+        }
+        else
+        {
+            m_Rankname.text = $"Unknown";
+            m_RankScore.text = "0";
+            m_MyRankText.text = "-";
+        }
+    }
+
+    public void GetLeaderboard()
+    {
+        var highScoreRequest = new GetLeaderboardRequest
+        {
+            StatisticName = "HighScore",
+            StartPosition = 0,
+            MaxResultsCount = 10
+        };
+
+        var killCountRequest = new GetLeaderboardRequest
+        {
+            StatisticName = "HighKill",
+            StartPosition = 0,
+            MaxResultsCount = 10
+        };
+
+        Dictionary<string, int> killCountDict = new Dictionary<string, int>();
+
+        // 먼저 KillCount 랭킹 가져오기
+        PlayFabClientAPI.GetLeaderboard(killCountRequest,
+        killResult =>
+        {
+            foreach (var item in killResult.Leaderboard)
+            {
+                if (!killCountDict.ContainsKey(item.PlayFabId))
+                    killCountDict.Add(item.PlayFabId, item.StatValue);
+            }
+
+            // 그 다음 HighScore 랭킹 가져오기
+            PlayFabClientAPI.GetLeaderboard(highScoreRequest,
+            result =>
+            {
+                foreach (Transform child in rankContent)
+                    Destroy(child.gameObject); // 기존 항목 제거
+
+                foreach (var item in result.Leaderboard)
+                {
+                    GameObject entry = Instantiate(rankItemPrefab, rankContent);
+                    var entryUI = entry.GetComponent<RankEntryUI>();
+
+                    Sprite trophySprite = null;
+                    if (item.Position < 3)
+                        trophySprite = rankSprites[item.Position];
+
+                    int killCount = killCountDict.ContainsKey(item.PlayFabId) ? killCountDict[item.PlayFabId] : 0;
+
+                    entryUI.SetRankInfo(
+                        rank: item.Position + 1,
+                        playerName: item.DisplayName,
+                        score: item.StatValue,
+                        kill: killCount,
+                        trophySprite: trophySprite
+                    );
+                }
+            },
+            error =>
+            {
+                Debug.LogError("HighScore 랭킹 불러오기 실패: " + error.GenerateErrorReport());
+            });
+        },
+        error =>
+        {
+            Debug.LogError("KillCount 랭킹 불러오기 실패: " + error.GenerateErrorReport());
+        });
+    }
+
+
+    public void OnClick_PopupOK()
+    {
+        SoundMgr.Instance.PlayEffSound("SFX_UI_Button_Click_Settings_2", 0.5f);
+        m_OnPopupConfirm.Invoke();   // null 체크 후 콜백 실행
+        HidePopupPanel();
+    }
+
+    public void HidePopupPanel()
+    {
+        SoundMgr.Instance.PlayEffSound("SFX_UI_Button_Click_Settings_2", 0.5f);
+        m_Popup.transform.DOScale(Vector3.zero, 0.3f)
+       .SetUpdate(true)
+       .SetEase(Ease.InBack)
+       .OnComplete(() =>
+       {
+           m_Popup.SetActive(false);
+           m_isPopup = false;
+           m_infoText.text = "";
+       });
+    }
+
 
     public IEnumerator CreateMonster()
     {
-
         while (!m_Gameover)
         {
-
             yield return new WaitForSeconds(m_CreateTime);//몬스터 생성 주기 시간만큼 메인 루프에 양보
-
-
             if (m_Curgame == GameState.End)   //플레이어가 사망했을 때 코루틴을 종료해 다음 루틴을 진행하지 않음
                 yield break;
-
             foreach (GameObject monster in m_EnemyPool)
             {
                 if (!monster.activeSelf) //비활성화 여부로 사용 가능한 몬스터를 판단
@@ -396,30 +758,7 @@ public class GameMgr : MonoBehaviour
                     monster.GetComponent<EnemyCtrl>().InitMonster();
                     break; //오브젝트 풀에서 몬스터 프리팹 하나를 활성화한 후 for 루프를 빠져나감
                 }
-
             }
-
-        }
-    }
-
-    public void RegisterEnemy(EnemyCtrl enemy)
-    {
-        if (!enemies.Contains(enemy))
-            enemies.Add(enemy);
-    }
-
-    public void UnregisterEnemy(EnemyCtrl enemy)
-    {
-        if (enemies.Contains(enemy))
-            enemies.Remove(enemy);
-    }
-
-    public void NotifyPlayerDied()
-    {
-        foreach (var enemy in enemies)
-        {
-            if (enemy != null)
-                enemy.OnPlayerDie();
         }
     }
 
@@ -454,9 +793,41 @@ public class GameMgr : MonoBehaviour
 
     public void RemoveScore()
     {
-        PlayerPrefs.DeleteKey("HighScore");
-        ShowGuide("기록이 초기화 됐습니다!", 5f);
+        m_Popup.transform.DOScale(Vector3.zero, 0.3f)
+       .SetUpdate(true)
+       .SetEase(Ease.InBack)
+       .OnComplete(() =>
+       {
+           m_Popup.SetActive(false);
+           m_isPopup = false;
+           SoundMgr.Instance.PlayEffSound("SFX_UI_Button_Click_Settings_2", 0.5f);
+           PlayerPrefs.DeleteKey("HighScore");
+           PlayerPrefs.DeleteKey("HighKill");
+           ShowGuide("기록이 초기화 됐습니다!", 5f);
+       });
     }
+
+    public void RegisterEnemy(EnemyCtrl enemy)
+    {
+        if (!enemies.Contains(enemy))
+            enemies.Add(enemy);
+    }
+
+    public void UnregisterEnemy(EnemyCtrl enemy)
+    {
+        if (enemies.Contains(enemy))
+            enemies.Remove(enemy);
+    }
+
+    public void NotifyPlayerDied()
+    {
+        foreach (var enemy in enemies)
+        {
+            if (enemy != null)
+                enemy.OnPlayerDie();
+        }
+    }
+
 
     public static bool IsPointerOverUIObject() //UGUI가 클릭되지 않도록 설정
     {

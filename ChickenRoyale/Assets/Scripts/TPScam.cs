@@ -63,6 +63,8 @@ public class TPScam : MonoBehaviour
 
     void LateUpdate()
     {
+        if(GameMgr.inst.m_Curgame == GameMgr.GameState.Pause)
+            return;
         x += Input.GetAxis("Mouse X") * xSpeed * 0.02f;
         y -= Input.GetAxis("Mouse Y") * ySpeed * 0.02f;
 

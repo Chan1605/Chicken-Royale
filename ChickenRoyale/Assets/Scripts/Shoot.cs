@@ -10,7 +10,10 @@ public class Shoot : MonoBehaviour
 {
     public Transform m_tip; //총구 위치
     public Transform m_GrenadeSpawn; //수류탄 위치
-    public GameObject m_bullet;
+    public GameObject[] m_bullet;
+    public int m_defaultBulletIndex = 0;
+    public int m_buffBulletIndex = 1;
+    private bool m_isBuffActive = false;
     public GameObject m_Grenade;
     public Camera m_playerCamera;
     public bool m_isAiming = false;
@@ -28,15 +31,16 @@ public class Shoot : MonoBehaviour
         if (PlayerCtrl.inst.m_isDie || GameMgr.inst.m_Curgame == GameMgr.GameState.End)
             return;
 
+        int curGrenade = InventoryManager.Inst.GetItemCount("2");
 
         if (Input.GetKeyDown(KeyCode.Q))
         {
-            if (GameMgr.inst.m_GranadeCount < 1)
+            if (curGrenade < 1)
             {
                 GameMgr.inst.ShowGuide("수류탄이 부족합니다!", 1f);
                 return;
             }
-            GameMgr.inst.GreGuide(-1);
+            InventoryManager.Inst.UseItem("2", 1); // 수류탄 1개 사용     
             if (m_AimGrenade)
                 ThrowGrenade(true, 1);
             else
@@ -44,12 +48,12 @@ public class Shoot : MonoBehaviour
         }
         else if (Input.GetKeyDown(KeyCode.R))
         {
-            if (GameMgr.inst.m_GranadeCount < 3)
+            if (curGrenade < 3)
             {
                 GameMgr.inst.ShowGuide("수류탄이 부족합니다!", 1f);
                 return;
             }
-            GameMgr.inst.GreGuide(-3);
+            InventoryManager.Inst.UseItem("2", 3);
             if (m_AimGrenade)
                 ThrowGrenade(true, 3);
             else
@@ -76,20 +80,6 @@ public class Shoot : MonoBehaviour
         }
     }
 
-    Vector3 GetAimTarget()
-    {
-        Ray ray = m_playerCamera.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
-        RaycastHit hit;
-        if (Physics.Raycast(ray, out hit))
-        {
-            return hit.point;
-        }
-        else
-        {
-            return ray.GetPoint(100f); // 가상 타겟
-        }
-    }
-
     void SpawnGrenade(Vector3 direction)
     {
         GameObject grenade = Instantiate(m_Grenade, m_GrenadeSpawn.position, Quaternion.identity);
@@ -111,23 +101,40 @@ public class Shoot : MonoBehaviour
         }
     }
 
-
     public void Shooteven()
     {
-        if (!m_isAiming)
-        {
-            Instantiate(m_bullet, m_tip.position, m_tip.rotation);
-        }
+        int bulletIndexToUse = m_isBuffActive ? m_buffBulletIndex : m_defaultBulletIndex;
+
         if (m_isAiming)
         {
             Vector3 target = GetAimTarget();
-
-            m_tip.LookAt(target);
-            Instantiate(m_bullet, m_tip.position, m_tip.rotation);
+            Vector3 direction = (target - m_tip.position).normalized;
+            Quaternion rotation = Quaternion.LookRotation(direction);
+            Instantiate(m_bullet[bulletIndexToUse], m_tip.position, rotation);
+        }
+        else
+        {
+            Instantiate(m_bullet[bulletIndexToUse], m_tip.position, m_tip.rotation);
+        }
+    }
+    Vector3 GetAimTarget()
+    {
+        Ray ray = m_playerCamera.ScreenPointToRay(new Vector3(Screen.width / 2, Screen.height / 2, 0));
+        RaycastHit hit;
+        if (Physics.Raycast(ray, out hit, 100f, LayerMask.GetMask("Enemy", "Wall")))
+        {
+            return hit.point;
+        }
+        else
+        {
+            return ray.GetPoint(100f); // 가상 타겟
         }
     }
 
-
+    public void SetBuffActive(bool active)
+    {
+        m_isBuffActive = active;
+    }
 
 
 

@@ -15,7 +15,6 @@ public class PlayerCtrl : MonoBehaviour
     public static PlayerCtrl inst = null;
     private float h;
     private float v;
-
     [Header("----- Player info -----")]
     [SerializeField] private float m_speed = 10.0f;
     [SerializeField] private float m_rotspeed = 10.0f;
@@ -28,6 +27,12 @@ public class PlayerCtrl : MonoBehaviour
     [Header("----- HP UI -----")]
     [SerializeField] private float m_MaxHp = 100;
     [SerializeField] private float m_CurHp;
+    [Header("획득 가능한 아이템 데이터")]
+    public InventoryItemData coinData;
+    public InventoryItemData diamondData;
+    public InventoryItemData grenadeData;
+    public InventoryItemData healData;
+    public InventoryItemData SellData;
     public Image hpbar;
     [Header("----- Effect -----")]
     public GameObject m_BloodDecal;
@@ -45,16 +50,16 @@ public class PlayerCtrl : MonoBehaviour
     [Header("----- Dash -----")]
     [SerializeField] private float m_dashSpeed = 25.0f;
     [SerializeField] private float m_dashDuration = 0.4f;
-    [SerializeField] private float m_dashStaminaCost = 20f;
+    [SerializeField] private float m_dashStaminaCost = 30f;
     [SerializeField] private float m_dashCooldown = 1.0f;
     private bool m_isDashing = false;
     private float m_dashTimer = 0f;
     private float m_dashCooldownTimer = 0f;
     [SerializeField] private float m_maxStamina = 100f;
     [SerializeField] private float m_curStamina;
-    [SerializeField] private float m_staminaRegenRate = 15f; // 초당 회복량
+    [SerializeField] private float m_staminaRegenRate = 20f; // 초당 회복량
     private bool m_isRecovering = false;
-    [SerializeField] private float m_recoveryThreshold = 40f; // 회복 완료 조건
+    [SerializeField] private float m_recoveryThreshold = 100f; // 회복 완료 조건
     [Header("----- Stamina UI -----")]
     public Slider staminaSlider;
     public TextMeshProUGUI staminaText;
@@ -92,16 +97,17 @@ public class PlayerCtrl : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (GameMgr.inst.m_Curgame == GameMgr.GameState.End || m_isDie)
+        if (GameMgr.inst.m_Curgame == GameMgr.GameState.End || m_isDie || GameMgr.inst.m_isInven)
             return;
 
         IsGround();
         PlayerAnimCheck();
 
-        m_firedur = m_firedur - Time.deltaTime;
+        m_firedur -= Time.deltaTime;
         if (m_firedur <= 0.0f)
         {
             m_firedur = 0.0f;
+
             if (Input.GetMouseButton(0))
             {
                 FireGun();
@@ -330,44 +336,57 @@ public class PlayerCtrl : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
+        Itempickup pickup = other.GetComponent<Itempickup>();
+        if (pickup == null)
+            return;
+
         if (other.gameObject.name.Contains("CoinPrefab"))
         {
             SoundMgr.Instance.PlayEffSound("Coin", 0.2f);
+            InventoryManager.Inst.AddGold(pickup.amount);
             Destroy(other.gameObject);
         }
         else if (other.gameObject.name.Contains("DiaPrefab"))
         {
             SoundMgr.Instance.PlayEffSound("Buff", 0.4f);
             if (m_buffCoroutine != null)
+            {
                 StopCoroutine(m_buffCoroutine);
-
+            }
             m_buffCoroutine = StartCoroutine(BuffAttackDamage(10, m_buffDuration));
+            InventoryManager.Inst.AddItem(pickup.itemData, pickup.amount);
             Destroy(other.gameObject);
         }
         else if (other.gameObject.name.Contains("ItemGrenadePrefab"))
         {
-            GameMgr.inst.GreGuide(1);
+            //GameMgr.inst.GreGuide(0);
+            InventoryManager.Inst.AddItem(pickup.itemData, pickup.amount);
             Destroy(other.gameObject);
         }
         else if (other.gameObject.name.Contains("HealObj"))
         {
             SoundMgr.Instance.PlayEffSound("Coin", 0.2f);
-            Heal(20,this.transform.position);
+            Heal(20, this.transform.position);
+            InventoryManager.Inst.AddItem(pickup.itemData, pickup.amount);
             Destroy(other.gameObject);
         }
 
     }
-
     private IEnumerator BuffAttackDamage(int buffAmount, float duration)
     {
-        int originalDamage = m_attackdamage;
+        Shoot shoot = GetComponent<Shoot>();
+        if (shoot == null)
+            yield break;
         m_attackdamage = buffAmount;
+
+        shoot.SetBuffActive(true);
         GameMgr.inst.StartBuff(duration);
 
         yield return new WaitForSeconds(duration);
-
-        m_attackdamage = originalDamage;
+        m_attackdamage = 1;
+        shoot.SetBuffActive(false);
     }
+
 
     void OnCollisionEnter(Collision other)
     {
@@ -466,7 +485,7 @@ public class PlayerCtrl : MonoBehaviour
         }
     }
 
-    public void Heal(int amount,Vector3 pos)
+    public void Heal(int amount, Vector3 pos)
     {
         m_CurHp += amount;
         if (m_CurHp > m_MaxHp)

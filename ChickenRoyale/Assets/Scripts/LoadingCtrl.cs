@@ -12,6 +12,7 @@ public class LoadingCtrl : MonoBehaviour
     [SerializeField] Image m_Loadimg;  
     [SerializeField] TextMeshProUGUI m_Tiptxt;
     [SerializeField] Sprite[] m_Randimg;
+    [SerializeField] TextMeshProUGUI m_Loadtxt;
     public List<string> m_texts = new List<string>();
     
 
@@ -56,6 +57,7 @@ public class LoadingCtrl : MonoBehaviour
                 timer += Time.unscaledDeltaTime;
                 float progress = Mathf.Clamp01(timer / mintimer);
                 m_Loadimg.fillAmount = progress;//Mathf.Lerp(0.0f, 1.0f, timer);
+                m_Loadtxt.text = $"{(int)(progress * 100)} %";
                 if (timer >= mintimer)//(m_Loadimg.fillAmount >= 1.0f)
                 {
                     op.allowSceneActivation = true;            

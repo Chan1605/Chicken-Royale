@@ -8,7 +8,6 @@ public class AimController : MonoBehaviour
     public float normalFOV = 60f;
     public float aimFOV = 30f;
     public float aimSpeed = 10f;
-
     void Start()
     {
 

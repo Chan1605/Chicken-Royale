@@ -46,7 +46,7 @@ public class HpbarCtrl : MonoBehaviour
             if (enemyTransform == null)
             {
                 toRemove.Add(enemyTransform);
-                Destroy(hpBar);             
+                Destroy(hpBar);
                 continue;
             }
 
@@ -56,7 +56,7 @@ public class HpbarCtrl : MonoBehaviour
             float distance = Vector3.Distance(m_cam.transform.position, enemyTransform.position);
 
 
-            if (screenPos.z < 0 || distance > 50 || GameMgr.inst.m_esc || GameMgr.inst.m_Gameover) 
+            if (screenPos.z < 0 || distance > 50 || GameMgr.inst.m_esc || GameMgr.inst.m_Gameover || GameMgr.inst.m_isInven)
             {
                 hpBar.SetActive(false);
             }
