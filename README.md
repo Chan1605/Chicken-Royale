@@ -1,6 +1,7 @@
 # git lfs pull 입력 필수!!
 # Chicken Royale 
 # 3D TPS
+<img alt="erd" src="./reallastBG.png"></p>
 # To do list 
 - [x] Player move, Camera move 
 - [x] Player anim 설정
