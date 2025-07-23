@@ -1,4 +1,3 @@
-# git lfs pull 입력 필수!!
 # Chicken Royale 
 # 3D TPS
 <img alt="img" src="./ChickenRoyale/Assets/Resources/Images/reallastBG.png"></p>
