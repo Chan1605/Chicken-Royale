@@ -104,3 +104,17 @@
 
 - [PlayFab 공식 문서](https://learn.microsoft.com/en-us/gaming/playfab/)
 - [Unity 공식 매뉴얼](https://docs.unity3d.com/Manual/index.html)
+
+## ⚠️ 주의사항: Terrain Texture(.tif) 누락 안내
+
+본 프로젝트의 Terrain 텍스처 파일(`.tif`)은 Git LFS로 관리되고 있습니다.
+
+### ⛔ 문제가 발생하는 경우:
+- GitHub에서 프로젝트를 **zip 다운로드**할 경우 `.tif` 파일이 누락되어 **Terrain 지형 메시가 보이지 않습니다.**
+- Unity에서 정상적으로 지형이 표시되지 않는다면, 아래의 방법을 확인해주세요.
+
+### ✅ 해결 방법:
+1. Git이 설치된 환경에서 아래 명령어로 클론해 주세요:
+   ```bash
+   git lfs install
+   git clone https://github.com/Chan1605/Chan1605.git
