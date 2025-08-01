@@ -11,8 +11,7 @@
 ## 🎬 Preview
 
 <img alt="screenshot" src="./ChickenRoyale/Assets/Resources/Images/reallastBG.png" width="80%"/>
-
----
+<p></p>| 🔗 Chicken Royale  | <a href="https://youtu.be/cAq-W0X-D7M">[🔗 YouTube 플레이 소개영상 바로가기]</a> <p>
 
 ## 🧩 Game Features
 
