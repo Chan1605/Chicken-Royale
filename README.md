@@ -11,8 +11,7 @@
 ## 🎬 Preview
 
 <!--<img alt="screenshot" src="./ChickenRoyale/Assets/Resources/Images/reallastBG.png" width="80%"/> -->
-<Img width ="800" height ="800" src="https://github.com/user-attachments/assets/847be2f7-2550-4eb3-b7fb-ce09e546c37d"/>
-
+<Img width ="800" height ="800" src="https://github.com/user-attachments/assets/2408eb8d-ba03-44df-8bcc-9d9718c19ded"/>
 
 
 <p></p>| 🔗 Chicken Royale  | <a href="https://youtu.be/cAq-W0X-D7M">[🔗 YouTube 플레이 소개영상 바로가기]</a> <p>
