@@ -11,9 +11,11 @@
 ## 🎬 Preview
 
 <!--<img alt="screenshot" src="./ChickenRoyale/Assets/Resources/Images/reallastBG.png" width="80%"/> -->
-<Img width ="600" height ="600" src="https://github.com/user-attachments/assets/2408eb8d-ba03-44df-8bcc-9d9718c19ded"/>
-
-
+<Img width ="500" height ="500" src="https://github.com/user-attachments/assets/2408eb8d-ba03-44df-8bcc-9d9718c19ded"/>
+<Img width ="500" height ="500" src="https://github.com/user-attachments/assets/729dd88e-c82e-4057-8079-a8dc2434b062"/>
+<p align="center">
+  <Img width ="500" height ="500" src="https://github.com/user-attachments/assets/495484fb-47b2-45dc-b8bc-979e45b328d2"/>
+</p>
 <p></p>| 🔗 Chicken Royale  | <a href="https://youtu.be/cAq-W0X-D7M">[🔗 YouTube 플레이 소개영상 바로가기]</a> <p>
 
 ## 🧩 Game Features
