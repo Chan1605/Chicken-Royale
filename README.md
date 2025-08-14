@@ -13,8 +13,11 @@
 <!--<img alt="screenshot" src="./ChickenRoyale/Assets/Resources/Images/reallastBG.png" width="80%"/> -->
 <p align="center">
   <Img width ="500" height ="500" src="https://github.com/user-attachments/assets/2408eb8d-ba03-44df-8bcc-9d9718c19ded"/>
-  <Img width ="500" height ="500" src="https://github.com/user-attachments/assets/729dd88e-c82e-4057-8079-a8dc2434b062"/>
-  <Img width ="500" height ="500" src="https://github.com/user-attachments/assets/495484fb-47b2-45dc-b8bc-979e45b328d2"/>
+    <p align="center"> - 닉네임 설정, 로딩 및 인벤토리 구현 - </p>
+  <p align="center"> <Img width ="500" height ="500" src="https://github.com/user-attachments/assets/729dd88e-c82e-4057-8079-a8dc2434b062"/>
+    <p align="center"> - 게임 플레이 - </p>
+  <p align="center"> <Img width ="500" height ="500" src="https://github.com/user-attachments/assets/495484fb-47b2-45dc-b8bc-979e45b328d2"/>
+    <p align="center"> - 게임오버,일시정지 및 랭킹 구현 - </p>
 </p>
 <p></p>| 🔗 Chicken Royale  | <a href="https://youtu.be/cAq-W0X-D7M">[🔗 YouTube 플레이 소개영상 ]</a> <p>
 
