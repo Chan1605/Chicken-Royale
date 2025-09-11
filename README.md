@@ -99,13 +99,8 @@
 
 ---
 
-## 🙋‍♂️ 개발자 정보
+## 샘플 코드
 
-| 이름 | 링크 |
-|------|------|
-| 김종찬 (JongChan Kim) | [Github](https://github.com/Chan1605) / [Email](mailto:qkqhoe@naver.com) |
-
----
 
 ## 🔖 참고 문서
 
