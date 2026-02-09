@@ -100,7 +100,7 @@
 ---
 
 ## 샘플 코드
-
+Inventory Sample Code
 
 ## 🔖 참고 문서
 
