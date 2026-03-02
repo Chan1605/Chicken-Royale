@@ -486,7 +486,7 @@ public class ItemBGSpriteDB : ScriptableObject
 
 
 
-
+</details>
 
 
 
