@@ -103,6 +103,392 @@
 
 플레이어 인벤토리의 아이템 관리 / 사용 / 판매 로직을 담당하는 핵심 코드입니다.
 오브젝트 풀링, 데이터 중심 설계, UI 연동을 고려하여 구현했습니다.
+<details> <summary><strong>📂 Inventory Sample Code (클릭해서 열기)</strong></summary> <br>Inventory sample
+
+using UnityEngine;
+using TMPro;
+using UnityEngine.UI;
+using System.Collections.Generic;
+
+public enum ItemType
+{
+    Yellow,
+    Green,
+    Purple,
+    Blue,
+    Brown
+}
+
+public enum ItemBehaviorType
+{
+    Use,
+    Sell,
+    None
+}
+[CreateAssetMenu(fileName = "NewItem", menuName = "Inventory/Item")]
+public class InventoryItemData : ScriptableObject
+{
+    public string itemId;
+    public string itemName;
+    public Sprite icon;
+    public int quantity;
+    public ItemType itemType;
+    public string description;
+    public int attack;
+    public int defense;
+    public int sellPrice;
+    public ItemBehaviorType behaviorType;
+}
+
+
+public class InventoryManager : MonoBehaviour
+{
+    public static InventoryManager Inst;
+    private readonly Dictionary<string, InventoryItemData> inventory = new();
+    private readonly Dictionary<string, InventorySlotUI> slotUIs = new();
+    [Header("----- UI -----")]
+    [SerializeField] private Transform slotParent;
+    [SerializeField] private GameObject slotPrefab;
+    public TextMeshProUGUI[] CurGold;
+
+    void Awake()
+    {
+        if (Inst == null)
+            Inst = this;
+        else
+            Destroy(gameObject); // 중복 방지
+    }
+    public void AddGold(int amount)
+    {
+        GameMgr.inst.AddGold(amount);
+        UpdateGoldUI();
+    }
+
+    public void UpdateGoldUI()
+    {
+        foreach (var text in CurGold)
+        {
+            if (text != null)
+                text.text = GameMgr.inst.Gold.ToString("N0");
+        }
+    }
+    public void AddItem(InventoryItemData newItem, int amount = 1)
+    {
+        if (inventory.ContainsKey(newItem.itemId))
+        {
+            inventory[newItem.itemId].quantity += amount;
+            slotUIs[newItem.itemId].UpdateSlot(inventory[newItem.itemId]);
+        }
+        else
+        {
+            InventoryItemData copy = Instantiate(newItem);
+            copy.quantity = amount;
+            inventory.Add(copy.itemId, copy);
+
+            GameObject slot = Instantiate(slotPrefab, slotParent);
+            InventorySlotUI ui = slot.GetComponent<InventorySlotUI>();
+            ui.SetSlot(copy);
+
+            slotUIs.Add(copy.itemId, ui);
+        }
+
+        if (newItem.itemId == "2")
+        {
+            GameMgr.inst.GreGuide(inventory["2"].quantity);
+        }
+    }
+
+    public void RefreshUI()
+    {
+        foreach (Transform child in slotParent)
+        {
+            Destroy(child.gameObject);
+        }
+
+        foreach (InventoryItemData item in inventory.Values)
+        {
+            GameObject go = Instantiate(slotPrefab, slotParent);
+            go.GetComponent<InventorySlotUI>().SetSlot(item);
+        }
+    }
+
+    public void RemoveItem(string itemId)
+    {
+        if (!inventory.ContainsKey(itemId))
+        {
+            return;
+        }
+
+        if (inventory.ContainsKey(itemId))
+        {
+            inventory.Remove(itemId);
+        }
+
+        if (slotUIs.ContainsKey(itemId))
+        {
+            InventorySlotUI ui = slotUIs[itemId];
+            slotUIs.Remove(itemId);
+            if (ui != null)
+            {
+                Destroy(ui.gameObject);
+            }
+        }
+        RefreshUI();
+    }
+
+    public int GetItemCount(string itemId)
+    {
+        if (inventory.ContainsKey(itemId))
+            return inventory[itemId].quantity;
+        return 0;
+    }
+
+    public void UseItem(string itemId, int amount = 1)
+    {
+        if (!inventory.ContainsKey(itemId))
+            return;
+
+        inventory[itemId].quantity -= amount;
+        if (inventory[itemId].quantity <= 0)
+        {
+            RemoveItem(itemId);
+        }
+        else  // 남아 있다면 UI만 갱신
+        {
+            slotUIs[itemId].UpdateSlot(inventory[itemId]);
+        }
+        if (itemId == "2") // 인게임 UI 수류탄 수량 동기화
+        {
+            GameMgr.inst.GreGuide(GetItemCount("2")); // 없으면 0 반환
+        }
+    }
+
+
+}
+
+public class InventorySlotUI : MonoBehaviour
+{
+    [SerializeField] Image Backimag;
+    [SerializeField] Image iconImage;
+    public TMP_Text countText;
+
+    private InventoryItemData itemData;
+
+
+    [SerializeField] private ItemBGSpriteDB bgSpriteDB;
+
+    public void SetSlot(InventoryItemData data)
+    {
+        itemData = data;
+        iconImage.sprite = data.icon;
+        countText.text = data.quantity.ToString();
+        if (Backimag != null && bgSpriteDB != null)
+            Backimag.sprite = bgSpriteDB.GetBGSprite(data.itemType);
+
+    }
+
+    public void SetData(InventoryItemData data)
+    {
+        itemData = data;
+        iconImage.sprite = data.icon;
+        countText.text = data.quantity.ToString();
+    }
+
+    public void UpdateSlot(InventoryItemData data)
+    {
+        countText.text = data.quantity.ToString();
+    }
+
+    public void OnClick()
+    {
+        InventoryUIManager.Inst.ShowItemDetail(itemData);
+    }
+}
+
+public class InventoryUIManager : MonoBehaviour
+{
+    public static InventoryUIManager Inst;
+
+    [SerializeField] private TextMeshProUGUI nameText;
+    [SerializeField] private TextMeshProUGUI descText;
+    [SerializeField] private TextMeshProUGUI AttText;
+    [SerializeField] private TextMeshProUGUI DefText;
+    [SerializeField] private GameObject detailPanel;
+    [SerializeField] private Image iconImage;
+    [SerializeField] private Image BackImg;
+    [SerializeField] private GameObject sellButton;
+    [SerializeField] private GameObject AllsellButton;
+    [SerializeField] private TMP_Text priceText;
+    [Header("Background Sprite DB")]
+    [SerializeField] private ItemBGSpriteDB bgSpriteDB;
+    private InventoryItemData currentItem;
+
+    private void Awake()
+    {
+        Inst = this;
+    }
+
+    private void Start()
+    {
+        sellButton.GetComponent<Button>().onClick.AddListener(OnClickSellItem);
+        AllsellButton.GetComponent<Button>().onClick.AddListener(OnClickSellAll);
+    }
+
+
+
+    public void OnClickSellItem()
+    {
+        if (currentItem == null)
+        {
+            Debug.Log("현재 아이템이 null입니다");
+            return;
+        }
+        int sellPrice = currentItem.sellPrice;//GetSellPrice(currentItem); // 가격 계산
+        currentItem.quantity--;
+        // 골드 증가
+        GameMgr.inst.AddGold(sellPrice);
+        InventoryManager.Inst.UpdateGoldUI();
+
+        if (currentItem.quantity <= 0)
+        {
+            string itemIdToRemove = currentItem.itemId;
+            currentItem = null;
+
+            InventoryManager.Inst.RemoveItem(itemIdToRemove);
+            detailPanel.SetActive(false);
+        }
+        else
+        {
+            InventoryManager.Inst.RefreshUI();         // UI 슬롯 갱신
+            ShowItemDetail(currentItem);               // 디테일 갱신
+        }
+
+    }
+
+    public void OnClickSellAll()
+    {
+        SellAllOfCurrentItem();
+    }
+    public void SellAllOfCurrentItem()
+    {
+        if (currentItem == null)
+        {
+            Debug.Log("판매할 아이템이 없습니다.");
+            return;
+        }
+
+        int quantity = currentItem.quantity;
+        int sellPrice = currentItem.sellPrice;
+
+        int totalGold = sellPrice * quantity;
+
+        // 골드 추가
+        GameMgr.inst.AddGold(totalGold);
+
+        // 아이템 제거
+        string itemIdToRemove = currentItem.itemId;
+        currentItem = null;
+
+        InventoryManager.Inst.RemoveItem(itemIdToRemove);
+        InventoryManager.Inst.UpdateGoldUI();
+
+        detailPanel.SetActive(false);
+        Debug.Log($"'{itemIdToRemove}' {quantity}개를 판매하고 {totalGold}골드를 얻었습니다.");
+    }
+
+    private int GetSellPrice(InventoryItemData item)
+    {
+        return item.itemType switch
+        {
+            ItemType.Purple => 1000,
+            ItemType.Green => 500,
+            ItemType.Brown => 150,
+            _ => 10
+        };
+    }
+
+
+    public void ShowItemDetail(InventoryItemData data)
+    {
+        if (data == null)
+            return;
+
+        currentItem = data;
+        nameText.text = data.itemName;
+        descText.text = data.description;
+        AttText.text = $"{data.attack}";
+        DefText.text = $"{data.defense}";
+        int sellPrice = GetSellPrice(data);
+        priceText.text = $"{sellPrice}";
+
+        if (iconImage != null && data.icon != null)
+        {
+            iconImage.sprite = data.icon;
+            iconImage.enabled = true;
+        }
+        if (BackImg != null && bgSpriteDB != null)
+        {
+            BackImg.sprite = bgSpriteDB.GetBGSprite(data.itemType);
+        }
+
+        switch (data.behaviorType)
+        {
+            case ItemBehaviorType.Use:
+                //useButton.SetActive(true);
+                sellButton.SetActive(false);
+                AllsellButton.SetActive(false);
+                break;
+
+            case ItemBehaviorType.Sell:
+                //useButton.SetActive(false);
+                sellButton.SetActive(true);
+                AllsellButton.SetActive(true);
+                break;
+            case ItemBehaviorType.None:
+                //useButton.SetActive(false);
+                sellButton.SetActive(false);
+                AllsellButton.SetActive(false);
+                break;
+        }
+
+        bool showStats = data.behaviorType == ItemBehaviorType.None;
+        AttText.transform.parent.gameObject.SetActive(showStats);
+        DefText.transform.parent.gameObject.SetActive(showStats);
+
+        detailPanel.SetActive(true);
+    }
+
+
+}
+
+[CreateAssetMenu(fileName = "ItemBGSpriteDB", menuName = "Inventory/Item BG Sprite DB")]
+public class ItemBGSpriteDB : ScriptableObject
+{
+    [System.Serializable]
+    public struct BGSpriteEntry
+    {
+        public ItemType type;
+        public Sprite bgSprite;
+    }
+
+    public BGSpriteEntry[] entries;
+
+    public Sprite GetBGSprite(ItemType type)
+    {
+        foreach (var entry in entries)
+        {
+            if (entry.type == type)
+                return entry.bgSprite;
+        }
+        return null;
+    }
+}
+
+
+
+
+
+
 
 ## 🔖 참고 문서
 
