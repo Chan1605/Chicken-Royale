@@ -7,7 +7,7 @@ using UnityEngine.UI;
 using DG.Tweening;
 using PlayFab;
 using PlayFab.ClientModels;
-
+// Portfolio maintenance comment (2026)
 public class GameMgr : MonoBehaviour
 {
     public enum GameState { Start, Pause, End };
