@@ -20,6 +20,7 @@
     <p align="center"> - 게임오버,일시정지 및 랭킹 구현 - </p>
 </p>
 <p></p>| 🔗 Chicken Royale  | <a href="https://youtu.be/cAq-W0X-D7M">[🔗 YouTube 플레이 소개영상 ]</a> <p>
+<p></p>| 🐔 Chicken Royale 기술개발서  | <a href="https://github.com/user-attachments/files/21710954/3D.pdf">[🔗 pdf 다운로드 ]</a> <p>
 
 ## 🧩 Game Features
 
